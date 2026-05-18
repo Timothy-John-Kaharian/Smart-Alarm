@@ -64,8 +64,7 @@ class MainActivity : FlutterActivity() {
 					val payload = call.argument<String>("payload") ?: ""
 					val launchAlarmUi = call.argument<Boolean>("launchAlarmUi") ?: true
 					val soundUri = call.argument<String>("soundUri")
-					scheduleNativeAlarm(alarmId, triggerAt, title, body, payload, launchAlarmUi, soundUri)
-					result.success(true)
+					result.success(scheduleNativeAlarm(alarmId, triggerAt, title, body, payload, launchAlarmUi, soundUri))
 				}
 				"cancelNativeAlarm" -> {
 					val alarmId = call.argument<Int>("id") ?: 0
@@ -114,19 +113,25 @@ class MainActivity : FlutterActivity() {
 		}
 	}
 
-	private fun scheduleNativeAlarm(alarmId: Int, triggerAtMillis: Long, title: String, body: String, payload: String, launchAlarmUi: Boolean, soundUri: String?) {
-		val am = getSystemService(ALARM_SERVICE) as android.app.AlarmManager
-		val intent = Intent(this, AlarmReceiver::class.java).apply {
-			action = "com.example.alarm_application.ALARM_TRIGGER"
-			putExtra("id", alarmId)
-			putExtra("title", title)
-			putExtra("body", body)
-			putExtra("payload", payload)
-			putExtra("launchAlarmUi", launchAlarmUi)
-			if (!soundUri.isNullOrEmpty()) putExtra("sound_uri", soundUri)
+	private fun scheduleNativeAlarm(alarmId: Int, triggerAtMillis: Long, title: String, body: String, payload: String, launchAlarmUi: Boolean, soundUri: String?): Boolean {
+		return try {
+			val am = getSystemService(ALARM_SERVICE) as android.app.AlarmManager
+			val intent = Intent(this, AlarmReceiver::class.java).apply {
+				action = "com.example.alarm_application.ALARM_TRIGGER"
+				putExtra("id", alarmId)
+				putExtra("title", title)
+				putExtra("body", body)
+				putExtra("payload", payload)
+				putExtra("launchAlarmUi", launchAlarmUi)
+				if (!soundUri.isNullOrEmpty()) putExtra("sound_uri", soundUri)
+			}
+			val pi = PendingIntent.getBroadcast(this, alarmId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+			am.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)
+			true
+		} catch (e: Exception) {
+			android.util.Log.e("MainActivity", "scheduleNativeAlarm failed: ${e.message}")
+			false
 		}
-		val pi = PendingIntent.getBroadcast(this, alarmId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-		am.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)
 	}
 
 	private fun cancelNativeAlarm(alarmId: Int) {

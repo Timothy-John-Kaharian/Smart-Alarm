@@ -128,33 +128,45 @@ class AlarmNotificationService {
         if (!preAlarmDate.isAfter(now)) {
           continue;
         }
-        try {
-          await scheduleNativeAlarm(
+        final nativeScheduled = await scheduleNativeAlarm(
+          _notificationIdForDay(alarm.notificationId, dayIndex, minutesBefore),
+          preAlarmDate.toLocal(),
+          'Alarm in $minutesBefore minute${minutesBefore > 1 ? 's' : ''}',
+          alarm.label,
+          payload: alarm.id,
+          launchAlarmUi: false,
+          soundUri: alarm.sound.filePath,
+        );
+        if (!nativeScheduled) {
+          await _scheduleFallbackNotification(
             _notificationIdForDay(alarm.notificationId, dayIndex, minutesBefore),
             preAlarmDate.toLocal(),
             'Alarm in $minutesBefore minute${minutesBefore > 1 ? 's' : ''}',
             alarm.label,
             payload: alarm.id,
             launchAlarmUi: false,
-            soundUri: alarm.sound.filePath,
           );
-        } catch (e) {
-          debugPrint('Native schedule for pre-alarm failed: $e');
         }
       }
 
-      try {
-        await scheduleNativeAlarm(
+      final nativeScheduled = await scheduleNativeAlarm(
+        _notificationIdForDay(alarm.notificationId, dayIndex),
+        scheduledDate.toLocal(),
+        'Smart Alarm',
+        alarm.label,
+        payload: alarm.id,
+        launchAlarmUi: true,
+        soundUri: alarm.sound.filePath,
+      );
+      if (!nativeScheduled) {
+        await _scheduleFallbackNotification(
           _notificationIdForDay(alarm.notificationId, dayIndex),
           scheduledDate.toLocal(),
           'Smart Alarm',
           alarm.label,
           payload: alarm.id,
           launchAlarmUi: true,
-          soundUri: alarm.sound.filePath,
         );
-      } catch (e) {
-        debugPrint('Native schedule for main alarm failed: $e');
       }
     }
   }
@@ -329,7 +341,7 @@ class AlarmNotificationService {
 
   /// Schedules a native Android alarm (more reliable than Flutter notifications)
   /// Platform-specific implementation for critical alarm functionality
-  Future<void> scheduleNativeAlarm(
+  Future<bool> scheduleNativeAlarm(
     int id,
     DateTime dateTime,
     String title,
@@ -339,7 +351,7 @@ class AlarmNotificationService {
     String? soundUri,
   }) async {
     try {
-      await _platform.invokeMethod('scheduleNativeAlarm', {
+      final scheduled = await _platform.invokeMethod<bool>('scheduleNativeAlarm', {
         'id': id,
         'triggerAt': dateTime.millisecondsSinceEpoch,
         'title': title,
@@ -348,9 +360,35 @@ class AlarmNotificationService {
         'launchAlarmUi': launchAlarmUi,
         'soundUri': soundUri,
       });
+      return scheduled ?? false;
     } catch (e) {
       debugPrint('scheduleNativeAlarm failed: $e');
+      return false;
     }
+  }
+
+  Future<void> _scheduleFallbackNotification(
+    int id,
+    DateTime dateTime,
+    String title,
+    String body, {
+    required String payload,
+    required bool launchAlarmUi,
+  }) async {
+    final scheduledDate = tz.TZDateTime.from(dateTime, tz.local);
+    await _notifications.zonedSchedule(
+      id: id,
+      title: title,
+      body: body,
+      scheduledDate: scheduledDate,
+      notificationDetails: _alarmNotificationDetails(
+        const AlarmSoundChoice.phoneFile(displayName: '', filePath: ''),
+      ),
+      payload: payload,
+      androidScheduleMode: launchAlarmUi
+          ? AndroidScheduleMode.inexactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle,
+    );
   }
 
   /// Cancels a previously scheduled native alarm

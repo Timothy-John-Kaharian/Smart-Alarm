@@ -5449,11 +5449,9 @@ class AlarmRingingScreen extends StatefulWidget {
 class _AlarmRingingScreenState extends State<AlarmRingingScreen> {
   late final List<MathQuestion> _questions;
   late final TextEditingController _answerController;
-  late final AudioPlayer _alarmPlayer;
   late final int _questionSeed;
   int _index = 0;
   String? _errorText;
-  String? _soundError;
 
   @override
   void initState() {
@@ -5465,35 +5463,13 @@ class _AlarmRingingScreenState extends State<AlarmRingingScreen> {
       seed: _questionSeed,
     );
     _answerController = TextEditingController();
-    _alarmPlayer = AudioPlayer()..setReleaseMode(ReleaseMode.loop);
-    // Stop any native playback started while the device was asleep, then
-    // start Flutter's player. This avoids duplicate overlapping audio.
-    Future.microtask(() async {
-      try {
-        await AlarmNotificationService.instance.stopNativeAlarmSound();
-      } catch (_) {}
-      if (mounted) await _playAlarmSound();
-    });
   }
 
   @override
   void dispose() {
-    _alarmPlayer.dispose();
     _answerController.dispose();
     super.dispose();
   }
-
-  Future<void> _playAlarmSound() async {
-    try {
-      await _alarmPlayer.stop();
-      await _alarmPlayer.play(widget.alarm.sound.toAudioSource());
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _soundError = 'Sound playback failed: $error');
-    }
-  }
-
-  Future<void> _stopAlarmSound() async => await _alarmPlayer.stop();
 
   Future<void> _submit() async {
     final parsed = int.tryParse(_answerController.text.trim());
@@ -5512,7 +5488,6 @@ class _AlarmRingingScreenState extends State<AlarmRingingScreen> {
         _answerController.clear();
       });
     } else {
-      await _stopAlarmSound();
       try {
         await AlarmNotificationService.instance.stopNativeAlarmSound();
       } catch (_) {}
@@ -5592,17 +5567,6 @@ class _AlarmRingingScreenState extends State<AlarmRingingScreen> {
                           color: Color(0xFF535867),
                         ),
                       ),
-                      if (_soundError != null) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          _soundError!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Color(0xFFE11D48),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
                       const SizedBox(height: 14),
                       Container(
                         padding: const EdgeInsets.symmetric(
