@@ -174,6 +174,7 @@ class _AlarmShellState extends State<AlarmShell> {
   final List<AlarmEntry> _alarms = [];
   bool? _notificationPermissionGranted;
   bool? _exactAlarmPermissionGranted;
+  int _contentRefreshToken = 0;
 
   @override
   void initState() {
@@ -188,6 +189,16 @@ class _AlarmShellState extends State<AlarmShell> {
   bool get _settingsNeedsAttention =>
       _notificationPermissionGranted != true ||
       _exactAlarmPermissionGranted != true;
+
+  void _notifyContentChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _contentRefreshToken++;
+    });
+  }
 
   Future<void> _loadAlarms() async {
     // Load alarms from storage and restore background schedules.
@@ -239,7 +250,7 @@ class _AlarmShellState extends State<AlarmShell> {
 
     setState(() {
       _alarms.insert(0, created);
-      _selectedTab = 0;
+      _selectedTab = 3;
     });
 
     // Schedule it in the OS and persist the updated list.
@@ -319,9 +330,12 @@ class _AlarmShellState extends State<AlarmShell> {
       );
     }
     final pages = [
-      const ScheduleScreen(),
-      const NotesScreen(),
-      HomeScreen(alarms: _alarms),
+      ScheduleScreen(onContentChanged: _notifyContentChanged),
+      NotesScreen(onContentChanged: _notifyContentChanged),
+      HomeScreen(
+        alarms: _alarms,
+        refreshToken: _contentRefreshToken,
+      ),
       AlarmListScreen(
         alarms: _alarms,
         onAddAlarm: _openCreateAlarm,
@@ -714,27 +728,27 @@ class AlarmCard extends StatelessWidget {
                         children: [
                           Text(
                             time.hour,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                ),
+                            style: const TextStyle(
+                              fontSize: 38,
+                              fontWeight: FontWeight.w900,
+                              height: 0.92,
+                            ),
                           ),
                           const SizedBox(width: 2),
                           Text(
                             ':${time.minute}',
                             style: const TextStyle(
-                              fontSize: 34,
-                              fontWeight: FontWeight.w800,
-                              height: 0.95,
+                              fontSize: 38,
+                              fontWeight: FontWeight.w900,
+                              height: 0.92,
                             ),
                           ),
                           const SizedBox(width: 4),
                           Text(
                             time.period,
                             style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
                               color: Color(0xFF868B9A),
                             ),
                           ),
@@ -744,9 +758,9 @@ class AlarmCard extends StatelessWidget {
                       Text(
                         alarm.label,
                         style: const TextStyle(
-                          fontSize: 15,
+                          fontSize: 16,
                           color: Color(0xFF2F3140),
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
@@ -920,9 +934,14 @@ class _SoundChip extends StatelessWidget {
 }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.alarms});
+  const HomeScreen({
+    super.key,
+    required this.alarms,
+    required this.refreshToken,
+  });
 
   final List<AlarmEntry> alarms;
+  final int refreshToken;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -952,6 +971,14 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      _loadData();
+    }
   }
 
   Future<void> _loadData() async {
@@ -1617,9 +1644,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       borderRadius: BorderRadius.circular(18),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 10),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
+                          color: Colors.black.withValues(alpha: 5),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
@@ -1910,7 +1937,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
 }
 
 class ScheduleScreen extends StatefulWidget {
-  const ScheduleScreen({super.key});
+  const ScheduleScreen({super.key, required this.onContentChanged});
+
+  final VoidCallback onContentChanged;
 
   @override
   State<ScheduleScreen> createState() => _ScheduleScreenState();
@@ -1971,6 +2000,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   Future<void> _saveSchedules() async {
     await ScheduleStorage.instance.saveSchedules(_schedules);
+    widget.onContentChanged();
   }
 
   Future<void> _openCreateSchedule() async {
@@ -2692,7 +2722,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 }
 
 class NotesScreen extends StatefulWidget {
-  const NotesScreen({super.key});
+  const NotesScreen({super.key, required this.onContentChanged});
+
+  final VoidCallback onContentChanged;
 
   @override
   State<NotesScreen> createState() => _NotesScreenState();
@@ -2751,6 +2783,7 @@ class _NotesScreenState extends State<NotesScreen> {
 
   Future<void> _saveNotes() async {
     await NoteStorage.instance.saveNotes(_notes);
+    widget.onContentChanged();
   }
 
   Future<void> _openCreateNote() async {
@@ -3561,19 +3594,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       child: Container(
         width: wide ? 160 : null,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.12) : Theme.of(context).colorScheme.surface,
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.10) : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: borderColor, width: selected ? 2 : 1),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 10),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : [],
+          boxShadow: const [],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -3777,9 +3802,27 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     TextField(
                       controller: _titleController,
                       decoration: InputDecoration(
-                        labelText: 'Title',
+                        hintText: 'Title here',
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 14,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: Color(0xFF2F3140)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: Color(0xFF2F3140)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).colorScheme.primary,
+                            width: 1.4,
+                          ),
                         ),
                       ),
                     ),
@@ -3788,9 +3831,28 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                       controller: _descriptionController,
                       maxLines: 5,
                       decoration: InputDecoration(
-                        labelText: 'Description',
+                        hintText: 'Description here',
+                        alignLabelWithHint: true,
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 14,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: Color(0xFF2F3140)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: Color(0xFF2F3140)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).colorScheme.primary,
+                            width: 1.4,
+                          ),
                         ),
                       ),
                     ),
@@ -3803,7 +3865,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   spacing: 8,
                   runSpacing: 8,
                   children: SchedulePriority.values
-                      .map((priority) => _priorityPill(priority, wide: true))
+                      .map((priority) => _priorityPill(priority))
                       .toList(),
                 ),
               ),
@@ -4244,16 +4306,10 @@ class _SearchFilterField extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: const Color(0xFFF8F9FC),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Theme.of(context).dividerColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 13),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        border: Border.all(color: const Color(0xFFE0E4F0)),
+        boxShadow: const [],
       ),
       child: TextField(
         controller: controller,
@@ -4271,15 +4327,15 @@ class _SearchFilterField extends StatelessWidget {
                   tooltip: 'Clear search',
                 ),
           filled: true,
-          fillColor: colorScheme.surface,
+          fillColor: Colors.white,
           contentPadding: const EdgeInsets.symmetric(vertical: 16),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide(color: Theme.of(context).dividerColor),
+            borderSide: const BorderSide(color: Color(0xFFE0E4F0)),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide(color: Theme.of(context).dividerColor),
+            borderSide: const BorderSide(color: Color(0xFFE0E4F0)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
@@ -4412,18 +4468,10 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
         width: wide ? 160 : null,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.12) : Colors.white,
+          color: selected ? color.withValues(alpha: 0.10) : Colors.white,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: borderColor, width: selected ? 2 : 1),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 10),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : [],
+          boxShadow: const [],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -4516,7 +4564,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment: MainAxisAlignment.start,
                             children: [
                               const Text(
                                 'From',
@@ -4526,6 +4574,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                                   color: Color(0xFF2F3140),
                                 ),
                               ),
+                              const SizedBox(width: 8),
                               Text(
                                 '${_startHour.toString().padLeft(2, '0')}:${_startMinute.toString().padLeft(2, '0')} ${_startIsPm ? 'PM' : 'AM'}',
                                 style: TextStyle(
@@ -4536,7 +4585,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 6),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -4598,7 +4647,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment: MainAxisAlignment.start,
                             children: [
                               const Text(
                                 'To',
@@ -4608,6 +4657,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                                   color: Color(0xFF2F3140),
                                 ),
                               ),
+                              const SizedBox(width: 8),
                               Text(
                                 '${_endHour.toString().padLeft(2, '0')}:${_endMinute.toString().padLeft(2, '0')} ${_endIsPm ? 'PM' : 'AM'}',
                                 style: const TextStyle(
@@ -4618,7 +4668,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 6),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -5254,13 +5304,11 @@ class _ScrollableNumberPickerState extends State<_ScrollableNumberPicker> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 10),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+              border: Border.all(
+                color: const Color(0xFFD7DCE8),
+                width: 1.2,
+              ),
+              boxShadow: const [],
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
