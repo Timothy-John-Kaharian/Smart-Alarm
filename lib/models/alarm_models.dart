@@ -5,9 +5,12 @@ import 'package:flutter/material.dart';
 
 import '../utils/alarm_formatters.dart';
 
+/// Defines difficulty levels for math questions users must solve to dismiss alarms
 enum AlarmDifficulty { easy, medium, hard }
 
+/// Extension to get user-friendly labels and colors for alarm difficulty levels
 extension AlarmDifficultyLabel on AlarmDifficulty {
+  /// Returns display label (e.g., 'Easy', 'Medium', 'Hard')
   String get label {
     switch (this) {
       case AlarmDifficulty.easy:
@@ -31,6 +34,7 @@ extension AlarmDifficultyLabel on AlarmDifficulty {
   }
 }
 
+/// Defines priority levels for schedule entries and notes
 enum SchedulePriority {
   veryImportant,
   semiImportant,
@@ -39,7 +43,9 @@ enum SchedulePriority {
   other,
 }
 
+/// Extension to get user-friendly labels and colors for schedule priority levels
 extension SchedulePriorityLabel on SchedulePriority {
+  /// Returns display label (e.g., 'Very Important', 'Optional')
   String get label {
     switch (this) {
       case SchedulePriority.veryImportant:
@@ -55,6 +61,7 @@ extension SchedulePriorityLabel on SchedulePriority {
     }
   }
 
+  /// Returns color associated with this priority level
   Color get color {
     switch (this) {
       case SchedulePriority.veryImportant:
@@ -71,22 +78,27 @@ extension SchedulePriorityLabel on SchedulePriority {
   }
 }
 
+/// Represents a single math question that appears on the alarm screen
+/// Users must answer correctly to dismiss the alarm
 class MathQuestion {
   const MathQuestion({required this.question, required this.answer});
 
-  final String question;
-  final int answer;
+  final String question;  // The math problem to display (e.g., "5 + 3 = ?")
+  final int answer;       // The correct answer
 }
 
+/// Defines types of alarm sounds available
 enum AlarmSoundKind { phoneFile }
 
+/// Represents a selected alarm sound with its file path and display name
 class AlarmSoundChoice {
-  const AlarmSoundChoice._({
+  const AlarmSoundChoice._(
     required this.kind,
     required this.displayName,
     this.filePath,
   });
 
+  /// Creates an alarm sound from a phone file
   const AlarmSoundChoice.phoneFile({
     required String displayName,
     required String filePath,
@@ -96,10 +108,11 @@ class AlarmSoundChoice {
          filePath: filePath,
        );
 
-  final AlarmSoundKind kind;
-  final String displayName;
-  final String? filePath;
+  final AlarmSoundKind kind;        // Type of sound
+  final String displayName;         // Name shown to user
+  final String? filePath;           // Path to the sound file
 
+  /// Converts this sound choice to JSON for storage
   Map<String, dynamic> toJson() {
     return {
       'kind': kind.name,
@@ -108,6 +121,7 @@ class AlarmSoundChoice {
     };
   }
 
+  /// Creates a sound choice from stored JSON data
   factory AlarmSoundChoice.fromJson(Map<String, dynamic>? json) {
     final filePath = json?['filePath'] as String?;
     if (filePath != null && filePath.isNotEmpty) {
@@ -123,6 +137,7 @@ class AlarmSoundChoice {
     );
   }
 
+  /// Converts this sound to an audio source for playback
   Source toAudioSource() {
     if (kind == AlarmSoundKind.phoneFile && filePath != null && filePath!.isNotEmpty) {
       return DeviceFileSource(filePath!);
@@ -132,6 +147,7 @@ class AlarmSoundChoice {
   }
 }
 
+/// Represents a complete alarm configuration with all its settings
 class AlarmEntry {
   const AlarmEntry({
     required this.id,
@@ -144,15 +160,16 @@ class AlarmEntry {
     required this.sound,
   });
 
-  final String id;
-  final int notificationId;
-  final TimeOfDay timeOfDay;
-  final String label;
-  final List<bool> repeatDays;
-  final AlarmDifficulty difficulty;
-  final bool enabled;
-  final AlarmSoundChoice sound;
+  final String id;                  // Unique identifier
+  final int notificationId;         // ID for system notifications
+  final TimeOfDay timeOfDay;        // Time when alarm should trigger
+  final String label;               // User-given name (e.g., "Morning Workout")
+  final List<bool> repeatDays;      // True for each day to repeat (7 days)
+  final AlarmDifficulty difficulty; // Math difficulty to solve
+  final bool enabled;               // Whether alarm is active
+  final AlarmSoundChoice sound;     // Selected alarm sound
 
+  /// Creates a modified copy of this alarm with selected fields changed
   AlarmEntry copyWith({
     String? id,
     int? notificationId,
@@ -189,6 +206,7 @@ class AlarmEntry {
     };
   }
 
+  /// Reconstructs an alarm from stored JSON data
   factory AlarmEntry.fromJson(Map<String, dynamic> json) {
     final repeatDays = (json['repeatDays'] as List<dynamic>? ?? const [])
         .map((day) => day == true)
@@ -212,6 +230,7 @@ class AlarmEntry {
   }
 }
 
+/// Represents a scheduled event (meeting, appointment, etc.)
 class ScheduleEntry {
   const ScheduleEntry({
     required this.id,
@@ -223,14 +242,15 @@ class ScheduleEntry {
     required this.priority,
   });
 
-  final String id;
-  final DateTime date;
-  final TimeOfDay startTime;
-  final TimeOfDay endTime;
-  final String title;
-  final String description;
-  final SchedulePriority priority;
+  final String id;              // Unique identifier
+  final DateTime date;          // Date of the schedule
+  final TimeOfDay startTime;    // When it starts
+  final TimeOfDay endTime;      // When it ends
+  final String title;           // Event title
+  final String description;     // Detailed description
+  final SchedulePriority priority; // Importance level
 
+  /// Creates a modified copy of this schedule entry
   ScheduleEntry copyWith({
     String? id,
     DateTime? date,
@@ -251,6 +271,7 @@ class ScheduleEntry {
     );
   }
 
+  /// Converts this schedule entry to JSON for storage
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -265,6 +286,7 @@ class ScheduleEntry {
     };
   }
 
+  /// Reconstructs a schedule entry from stored JSON data
   factory ScheduleEntry.fromJson(Map<String, dynamic> json) {
     final priorityIndex = (json['priority'] as int?) ?? SchedulePriority.other.index;
     final safePriorityIndex = priorityIndex.clamp(0, SchedulePriority.values.length - 1);
@@ -287,6 +309,7 @@ class ScheduleEntry {
   }
 }
 
+/// Represents a quick note with priority and date
 class NoteEntry {
   const NoteEntry({
     required this.id,
@@ -296,12 +319,13 @@ class NoteEntry {
     required this.priority,
   });
 
-  final String id;
-  final DateTime date;
-  final String title;
-  final String description;
-  final SchedulePriority priority;
+  final String id;              // Unique identifier
+  final DateTime date;          // When note was created
+  final String title;           // Note title
+  final String description;     // Note content
+  final SchedulePriority priority; // Importance level
 
+  /// Creates a modified copy of this note
   NoteEntry copyWith({
     String? id,
     DateTime? date,
@@ -318,6 +342,7 @@ class NoteEntry {
     );
   }
 
+  /// Converts this note to JSON for storage
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -328,6 +353,7 @@ class NoteEntry {
     };
   }
 
+  /// Reconstructs a note from stored JSON data
   factory NoteEntry.fromJson(Map<String, dynamic> json) {
     final priorityIndex = (json['priority'] as int?) ?? SchedulePriority.other.index;
     final safePriorityIndex = priorityIndex.clamp(0, SchedulePriority.values.length - 1);
@@ -342,6 +368,10 @@ class NoteEntry {
   }
 }
 
+/// Generates random math questions based on difficulty level
+/// Used to create wake-up challenge questions
+/// - count: Number of questions to generate (default 3)
+/// - seed: Optional seed for reproducible questions (for testing)
 List<MathQuestion> generateQuestions(
   AlarmDifficulty difficulty, {
   int count = 3,
@@ -402,6 +432,8 @@ List<MathQuestion> generateQuestions(
   return questions;
 }
 
+/// Helper function: generates a single random number based on difficulty
+/// Easy: 2-9, Medium: 2-10, Hard: 2-20
 int _nextNumber(Random random, AlarmDifficulty difficulty) {
   switch (difficulty) {
     case AlarmDifficulty.easy:

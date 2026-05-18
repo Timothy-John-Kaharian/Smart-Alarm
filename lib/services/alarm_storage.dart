@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/alarm_models.dart';
 
+/// Manages saving and loading alarm data from device storage (persistent)
+/// Uses SharedPreferences for local storage
 class AlarmStorage {
   AlarmStorage._();
 
@@ -12,6 +14,8 @@ class AlarmStorage {
   static const String _alarmsKey = 'saved_alarms';
   static const String _nextAlarmIdKey = 'next_alarm_id';
 
+  /// Loads all saved alarms from local storage
+  /// Automatically updates next alarm ID to prevent duplicates
   Future<List<AlarmEntry>> loadAlarms() async {
     final preferences = await SharedPreferences.getInstance();
     final rawAlarms = preferences.getStringList(_alarmsKey) ?? const [];
@@ -31,6 +35,8 @@ class AlarmStorage {
     return alarms;
   }
 
+  /// Saves all alarms to local storage
+  /// Also updates the next alarm ID counter to prevent duplicates
   Future<void> saveAlarms(List<AlarmEntry> alarms) async {
     final preferences = await SharedPreferences.getInstance();
     final encodedAlarms = alarms
@@ -46,6 +52,8 @@ class AlarmStorage {
     await preferences.setInt(_nextAlarmIdKey, nextId);
   }
 
+  /// Generates a unique ID for a new alarm
+  /// Ensures no two alarms have the same ID
   Future<int> allocateAlarmId() async {
     final preferences = await SharedPreferences.getInstance();
     final nextId = preferences.getInt(_nextAlarmIdKey) ?? 1;
@@ -54,12 +62,14 @@ class AlarmStorage {
   }
 }
 
+/// Manages saving and loading scheduled events from local storage
 class ScheduleStorage {
   ScheduleStorage._();
 
   static final ScheduleStorage instance = ScheduleStorage._();
   static const String _schedulesKey = 'saved_schedules';
 
+  /// Loads all saved schedules from local storage
   Future<List<ScheduleEntry>> loadSchedules() async {
     final preferences = await SharedPreferences.getInstance();
     final rawSchedules = preferences.getStringList(_schedulesKey) ?? const [];
@@ -68,6 +78,7 @@ class ScheduleStorage {
         .toList(growable: false);
   }
 
+  /// Saves all schedules to local storage
   Future<void> saveSchedules(List<ScheduleEntry> schedules) async {
     final preferences = await SharedPreferences.getInstance();
     final encodedSchedules = schedules
@@ -77,12 +88,14 @@ class ScheduleStorage {
   }
 }
 
+/// Manages saving and loading user notes from local storage
 class NoteStorage {
   NoteStorage._();
 
   static final NoteStorage instance = NoteStorage._();
   static const String _notesKey = 'saved_notes';
 
+  /// Loads all saved notes from local storage
   Future<List<NoteEntry>> loadNotes() async {
     final preferences = await SharedPreferences.getInstance();
     final rawNotes = preferences.getStringList(_notesKey) ?? const [];
@@ -91,6 +104,7 @@ class NoteStorage {
         .toList(growable: false);
   }
 
+  /// Saves all notes to local storage
   Future<void> saveNotes(List<NoteEntry> notes) async {
     final preferences = await SharedPreferences.getInstance();
     final encodedNotes = notes

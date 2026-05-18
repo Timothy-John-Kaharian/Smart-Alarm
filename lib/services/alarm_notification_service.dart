@@ -8,6 +8,13 @@ import 'package:timezone/timezone.dart' as tz;
 import '../models/alarm_models.dart';
 import 'alarm_storage.dart';
 
+/// Manages all alarm scheduling, notifications, and native alarm integration
+/// Handles:
+/// - Scheduling recurring alarms on specific days/times
+/// - Reminder notifications (10, 5, 1 minute before alarm)
+/// - Main alarm notification at alarm time
+/// - Canceling alarms
+/// - Platform-specific native alarm handling
 class AlarmNotificationService {
   AlarmNotificationService._();
 
@@ -18,6 +25,9 @@ class AlarmNotificationService {
   static const MethodChannel _platform = MethodChannel('alarm_app/settings');
   Future<void> Function(String payload)? _onAlarmTriggered;
 
+  /// Initializes notification service, time zones, and permission handlers
+  /// Should be called once at app startup
+  /// - onAlarmTriggered: Callback when alarm is triggered
   Future<void> initialize({Future<void> Function(String payload)? onAlarmTriggered}) async {
     _onAlarmTriggered = onAlarmTriggered ?? _onAlarmTriggered;
 
@@ -83,6 +93,7 @@ class AlarmNotificationService {
     _isInitialized = true;
   }
 
+  /// Reschedules all saved alarms (useful after phone reboot)
   Future<void> rescheduleAll(List<AlarmEntry> alarms) async {
     await initialize();
 
@@ -91,6 +102,11 @@ class AlarmNotificationService {
     }
   }
 
+  /// Schedules or updates a single alarm
+  /// - Cancels any existing notifications for this alarm
+  /// - Schedules reminders (10, 5, 1 minute before)
+  /// - Schedules main alarm notification
+  /// - Uses native platform alarms for better reliability
   Future<void> scheduleAlarm(AlarmEntry alarm) async {
     await initialize();
 
@@ -143,6 +159,8 @@ class AlarmNotificationService {
     }
   }
 
+  /// Cancels all notifications and alarms for a specific alarm entry
+  /// Removes reminders and main alarm for all repeat days
   Future<void> cancelAlarm(AlarmEntry alarm) async {
     await initialize();
 
@@ -175,6 +193,8 @@ class AlarmNotificationService {
     }
   }
 
+  /// Cancels ALL alarms and notifications in the entire app
+  /// Used when user clears all alarms or uninstalls
   Future<void> cancelAll() async {
     await initialize();
     try {
@@ -189,11 +209,14 @@ class AlarmNotificationService {
     await _notifications.cancelAll();
   }
 
+  /// Returns list of currently pending notifications
   Future<List<PendingNotificationRequest>> pendingNotifications() async {
     await initialize();
     return _notifications.pendingNotificationRequests();
   }
 
+  /// Shows an immediate test notification (doesn't use scheduling)
+  /// Used to test alarm notifications and sounds
   Future<void> showImmediateTestNotification(AlarmEntry alarm) async {
     await initialize();
     await _notifications.show(
@@ -205,6 +228,7 @@ class AlarmNotificationService {
     );
   }
 
+  /// Schedules a test alarm to trigger in 10 seconds (for quick testing)
   Future<void> scheduleQuickZonedTest() async {
     await initialize();
     final now = tz.TZDateTime.now(tz.local);
@@ -234,6 +258,8 @@ class AlarmNotificationService {
     }
   }
 
+  /// Requests notification permission from user (Android 13+)
+  /// Returns true if user grants permission, false if denied
   Future<bool?> requestNotificationPermission() async {
     await initialize();
     final androidImpl = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
@@ -245,6 +271,7 @@ class AlarmNotificationService {
     }
   }
 
+  /// Checks if notifications are currently enabled
   Future<bool?> areNotificationsEnabled() async {
     await initialize();
     final androidImpl = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
@@ -256,6 +283,8 @@ class AlarmNotificationService {
     }
   }
 
+  /// Requests permission to set exact alarms (Android 12+)
+  /// Needed for accurate alarm triggering
   Future<bool?> requestExactAlarmsPermission() async {
     await initialize();
     final androidImpl = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
@@ -267,6 +296,7 @@ class AlarmNotificationService {
     }
   }
 
+  /// Checks if app can schedule exact notifications
   Future<bool?> canScheduleExactNotifications() async {
     await initialize();
     final androidImpl = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
@@ -278,6 +308,7 @@ class AlarmNotificationService {
     }
   }
 
+  /// Opens the app's settings page on the device
   Future<void> openAppSettings() async {
     try {
       await _platform.invokeMethod('openAppSettings');
@@ -286,6 +317,8 @@ class AlarmNotificationService {
     }
   }
 
+  /// Opens the device's battery optimization settings
+  /// Users can add app to battery whitelist for reliable alarms
   Future<void> openBatterySettings() async {
     try {
       await _platform.invokeMethod('openBatterySettings');
@@ -294,6 +327,8 @@ class AlarmNotificationService {
     }
   }
 
+  /// Schedules a native Android alarm (more reliable than Flutter notifications)
+  /// Platform-specific implementation for critical alarm functionality
   Future<void> scheduleNativeAlarm(
     int id,
     DateTime dateTime,
@@ -318,6 +353,7 @@ class AlarmNotificationService {
     }
   }
 
+  /// Cancels a previously scheduled native alarm
   Future<void> cancelNativeAlarm(int id) async {
     try {
       await _platform.invokeMethod('cancelNativeAlarm', {'id': id});
@@ -326,6 +362,7 @@ class AlarmNotificationService {
     }
   }
 
+  /// Stops the alarm sound that's currently playing
   Future<void> stopNativeAlarmSound() async {
     try {
       await _platform.invokeMethod('stopNativeAlarmSound');
@@ -334,6 +371,7 @@ class AlarmNotificationService {
     }
   }
 
+  /// Creates notification details for alarm notifications (title, body, sound, etc.)
   NotificationDetails _alarmNotificationDetails(AlarmSoundChoice sound) {
     return const NotificationDetails(
       android: AndroidNotificationDetails(
@@ -354,6 +392,8 @@ class AlarmNotificationService {
   }
 }
 
+/// Generates unique notification ID based on alarm ID, day, and reminder time
+/// Formula ensures no two notifications have the same ID
 int _notificationIdForDay(int alarmId, int dayIndex, [int minutesBefore = 0]) {
   if (minutesBefore == 0) {
     return alarmId * 100 + dayIndex;
@@ -362,6 +402,8 @@ int _notificationIdForDay(int alarmId, int dayIndex, [int minutesBefore = 0]) {
   return alarmId * 100 + dayIndex + (offsetMap[minutesBefore] ?? 0);
 }
 
+/// Calculates the next occurrence of a weekly alarm on a specific day
+/// If the scheduled time has already passed today, schedules for next week
 tz.TZDateTime _nextWeeklyOccurrence(TimeOfDay timeOfDay, int dayIndex) {
   final now = tz.TZDateTime.now(tz.local);
   var scheduled = tz.TZDateTime(

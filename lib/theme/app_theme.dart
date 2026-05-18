@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+/// Builds the complete theme for the app with customizable seed color
+/// Supports both light and dark brightness modes
+/// Creates consistent styling for all UI components (cards, buttons, inputs, etc.)
 ThemeData buildAlarmTheme(Color seedColor, Brightness brightness) {
   final scheme = ColorScheme.fromSeed(seedColor: seedColor, brightness: brightness);
   final isDark = brightness == Brightness.dark;
