@@ -92,7 +92,7 @@ enum AlarmSoundKind { phoneFile }
 
 /// Represents a selected alarm sound with its file path and display name
 class AlarmSoundChoice {
-  const AlarmSoundChoice._(
+  const AlarmSoundChoice._({
     required this.kind,
     required this.displayName,
     this.filePath,
